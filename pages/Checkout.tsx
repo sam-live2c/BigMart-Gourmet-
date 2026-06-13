@@ -228,6 +228,10 @@ const Checkout: React.FC<CheckoutProps> = ({
   const savings = originalTotal - total;
 
   useEffect(() => {
+    if (step !== 3) {
+      setCountdown(29);
+      return;
+    }
     if (countdown <= 0) {
       navigate("/cart");
       return;
@@ -236,7 +240,7 @@ const Checkout: React.FC<CheckoutProps> = ({
       setCountdown((prev) => prev - 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [countdown, navigate]);
+  }, [countdown, navigate, step]);
 
   useEffect(() => {
     // scroll to top on step change
