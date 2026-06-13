@@ -403,7 +403,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
 
               {pincodeStatus === 'available' && (
                 <div className="flex items-center gap-2 text-xs font-semibold text-[#15803d] bg-green-50/50 px-3 py-2 rounded-xl border border-green-100">
-                  <span className="w-2 h-2 rounded-full bg-[#15803d] animate-pulse" />
+                  <Check size={14} className="stroke-[3] shrink-0" />
                   <span>Superfast delivery available under 1 hour!</span>
                 </div>
               )}
