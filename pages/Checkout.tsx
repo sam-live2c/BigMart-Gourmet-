@@ -883,7 +883,7 @@ const Checkout: React.FC<CheckoutProps> = ({
                       </div>
                       <div className="mt-3 border border-gray-300 bg-gray-50 rounded-sm px-2 py-1 flex items-center justify-between text-xs min-w-[70px] font-medium text-gray-700 w-full hover:bg-gray-100 cursor-pointer">
                         <span>
-                          `Qty: ${item.quantity}`
+                          Qty: {item.quantity}
                         </span>
                       </div>
                     </div>
@@ -904,7 +904,7 @@ const Checkout: React.FC<CheckoutProps> = ({
                           ₹{Math.round((item.price ?? 0) * 1.15).toLocaleString()}
                         </span>
                         <span className="text-[19px] font-semibold text-gray-900 leading-none">
-                          `₹${(item.price ?? 0).toLocaleString()}`
+                          ₹{(item.price ?? 0).toLocaleString()}
                         </span>
                       </div>
                     </div>
