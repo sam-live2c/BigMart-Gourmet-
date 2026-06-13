@@ -1,0 +1,173 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Match users
+    match /users/{userId} {
+      // Validate UserProfile properties
+      function isValidUserProfile(data) {
+        return data.name is string && data.name.size() > 0 && data.name.size() <= 200
+            && data.email is string && data.email.size() > 0 && data.email.size() <= 320
+            && (data.address == null || (data.address is string && data.address.size() <= 1000));
+      }
+
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) 
+                    && isValidId(userId)
+                    && incoming().keys().hasAll(['name', 'email']) 
+                    && incoming().keys().size() <= 6
+                    && isValidUserProfile(incoming());
+      allow update: if isOwner(userId) 
+                    && isValidUserProfile(incoming())
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email', 'address', 'addresses', 'orders']);
+      allow delete: if false;
+
+      // Addresses subcollection
+      match /addresses/{addressId} {
+        function isValidAddress(data) {
+          return data.id is string && data.id.size() <= 128
+              && data.type is string && data.type.size() <= 50
+              && data.name is string && data.name.size() <= 200
+              && data.phone is string && data.phone.size() <= 30
+              && data.pincode is string && data.pincode.size() <= 15
+              && data.villCity is string && data.villCity.size() <= 500
+              && (data.state == null || (data.state is string && data.state.size() <= 100))
+              && (data.district == null || (data.district is string && data.district.size() <= 100))
+              && (data.country == null || (data.country is string && data.country.size() <= 100))
+              && (data.countryCode == null || (data.countryCode is string && data.countryCode.size() <= 10))
+              && (data.isDefault == null || data.isDefault is bool);
+        }
+
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId)
+                      && isValidId(addressId)
+                      && incoming().keys().hasAll(['id', 'type', 'name', 'phone', 'pincode', 'villCity'])
+                      && isValidAddress(incoming());
+        allow update: if isOwner(userId)
+                      && isValidId(addressId)
+                      && isValidAddress(incoming());
+        allow delete: if isOwner(userId);
+      }
+
+      // Cart subcollection
+      match /cart/{itemId} {
+        function isValidCartItem(data) {
+          return data.id is string && data.id.size() <= 128
+              && data.name is string && data.name.size() <= 500
+              && data.price is number && data.price >= 0
+              && data.quantity is number && data.quantity >= 0
+              && (data.kgQuantity == null || data.kgQuantity is number)
+              && (data.gmQuantity == null || data.gmQuantity is number)
+              && (data.image == null || (data.image is string && data.image.size() <= 1000))
+              && (data.category == null || (data.category is string && data.category.size() <= 200));
+        }
+
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId)
+                      && isValidId(itemId)
+                      && incoming().keys().hasAll(['id', 'name', 'price', 'quantity'])
+                      && isValidCartItem(incoming());
+        allow update: if isOwner(userId)
+                      && isValidId(itemId)
+                      && isValidCartItem(incoming())
+                      && incoming().diff(existing()).affectedKeys().hasOnly(['quantity', 'kgQuantity', 'gmQuantity']);
+        allow delete: if isOwner(userId);
+      }
+
+      // Wishlist subcollection
+      match /wishlist/{productId} {
+        function isValidWishlistItem(data) {
+          return data.productId is string && data.productId.size() <= 128;
+        }
+
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId)
+                      && isValidId(productId)
+                      && incoming().keys().hasAll(['productId'])
+                      && isValidWishlistItem(incoming());
+        allow delete: if isOwner(userId);
+      }
+
+      // Orders subcollection
+      match /orders/{orderId} {
+        function isValidOrder(data) {
+          return data.id is string && data.id.size() <= 128
+              && data.date is string && data.date.size() <= 100
+              && data.total is number && data.total >= 0
+              && data.status is string && data.status.size() <= 100;
+        }
+
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId)
+                      && isValidId(orderId)
+                      && incoming().keys().hasAll(['id', 'date', 'total', 'status'])
+                      && isValidOrder(incoming());
+        allow update: if isOwner(userId)
+                      && isValidId(orderId)
+                      && isValidOrder(incoming())
+                      && incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+                      && existing().status != 'Delivered'
+                      && existing().status != 'Cancelled'
+                      && existing().status != 'Returned';
+        allow delete: if false;
+      }
+    }
+
+    // Match reviews root collection
+    match /reviews/{reviewId} {
+      function isValidReview(data) {
+        return data.id is string && data.id.size() <= 128
+            && data.productId is string && data.productId.size() <= 128
+            && data.userId is string && data.userId == request.auth.uid
+            && data.userName is string && data.userName.size() > 0 && data.userName.size() <= 200
+            && (data.userImage == null || (data.userImage is string && data.userImage.size() <= 1000))
+            && data.rating is number && data.rating >= 1 && data.rating <= 5
+            && data.comment is string && data.comment.size() > 0 && data.comment.size() <= 5000
+            && data.createdAt is number
+            && (data.isVerified == null || data.isVerified is bool)
+            && (data.helpfulCount == null || data.helpfulCount is number);
+      }
+
+      allow read, list: if true;
+      allow create: if isSignedIn()
+                    && isValidId(reviewId)
+                    && incoming().keys().hasAll(['id', 'productId', 'userId', 'userName', 'rating', 'comment', 'createdAt'])
+                    && isValidReview(incoming());
+      allow update: if isSignedIn()
+                    && isValidId(reviewId)
+                    && isOwner(existing().userId)
+                    && isValidReview(incoming())
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['rating', 'comment', 'createdAt']);
+      allow delete: if isSignedIn() && isOwner(existing().userId);
+    }
+  }
+}
